@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>우리 동네 지진 관측기</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
     <style>
         * {
             margin: 0;
@@ -133,17 +134,14 @@
             padding: 20px;
             box-shadow: 8px 8px 0 rgba(0,0,0,0.2);
             position: relative;
-            min-height: 600px;
         }
 
         #map {
             width: 100%;
             height: 600px;
-            background: #e0f2ff;
             border: 3px solid #333;
             border-radius: 4px;
-            position: relative;
-            overflow: hidden;
+            z-index: 1;
         }
 
         .sidebar {
@@ -199,55 +197,20 @@
             border-radius: 50%;
         }
 
-        .earthquake-marker {
-            position: absolute;
-            border-radius: 50%;
-            border: 2px solid #333;
-            cursor: pointer;
-            transition: all 0.2s;
-            animation: pulse 2s infinite;
-        }
-
-        .earthquake-marker:hover {
-            transform: scale(1.3);
-            z-index: 100;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 0.8; }
-            50% { opacity: 1; }
-        }
-
-        .tooltip {
-            position: absolute;
-            background: #fff;
-            border: 3px solid #333;
-            border-radius: 4px;
-            padding: 10px;
-            font-size: 12px;
-            pointer-events: none;
-            z-index: 1000;
-            box-shadow: 4px 4px 0 rgba(0,0,0,0.2);
-            display: none;
-            max-width: 250px;
-        }
-
-        .tooltip-title {
-            font-weight: bold;
-            margin-bottom: 5px;
-            color: #ff6b6b;
-        }
-
-        .tooltip-info {
-            margin: 3px 0;
-            color: #333;
-        }
-
         .loading {
             text-align: center;
             padding: 40px;
             font-size: 18px;
             color: #333;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border: 3px solid #333;
+            border-radius: 8px;
+            z-index: 1000;
+            box-shadow: 4px 4px 0 rgba(0,0,0,0.2);
         }
 
         .loading::after {
@@ -310,18 +273,42 @@
             font-weight: bold;
         }
 
+        .leaflet-popup-content-wrapper {
+            border: 3px solid #333;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .leaflet-popup-content {
+            margin: 10px;
+        }
+
+        .popup-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #ff6b6b;
+            font-size: 14px;
+        }
+
+        .popup-info {
+            margin: 4px 0;
+            font-size: 12px;
+            color: #333;
+        }
+
         @media (max-width: 1024px) {
             .main-content {
                 grid-template-columns: 1fr;
             }
         }
 
-        .pixel-icon {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            background: #333;
-            margin-right: 5px;
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+
+        .earthquake-marker {
+            animation: pulse 2s infinite;
         }
     </style>
 </head>
@@ -370,10 +357,7 @@
 
         <div class="main-content">
             <div class="map-container">
-                <div id="map">
-                    <div class="loading">지진 데이터 로딩 중</div>
-                </div>
-                <div class="tooltip" id="tooltip"></div>
+                <div id="map"></div>
             </div>
 
             <div class="sidebar">
@@ -430,11 +414,29 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <script>
+        let map;
+        let markers = [];
         let earthquakeData = [];
         let filteredData = [];
         let simulationInterval = null;
         let simulationIndex = 0;
+
+        function initMap() {
+            map = L.map('map', {
+                center: [20, 0],
+                zoom: 2,
+                minZoom: 2,
+                maxZoom: 10,
+                worldCopyJump: true
+            });
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap',
+                noWrap: false
+            }).addTo(map);
+        }
 
         function getColor(depth) {
             if (depth < 70) return '#ff6b6b';
@@ -443,13 +445,7 @@
         }
 
         function getSize(magnitude) {
-            return Math.max(6, Math.min(40, magnitude * 5));
-        }
-
-        function latLngToPixel(lat, lng, mapWidth, mapHeight) {
-            const x = (lng + 180) * (mapWidth / 360);
-            const y = (90 - lat) * (mapHeight / 180);
-            return { x, y };
+            return Math.max(4, Math.min(20, magnitude * 3));
         }
 
         function filterByRegion(data, region) {
@@ -459,7 +455,8 @@
                 const [lng, lat] = eq.geometry.coordinates;
                 
                 if (region === 'ring') {
-                    return (lng >= 120 && lng <= -60 && lat >= -60 && lat <= 60);
+                    return (lng >= 120 && lng <= -60 && lat >= -60 && lat <= 60) ||
+                           (lng >= -180 && lng <= -60 && lat >= -60 && lat <= 60);
                 } else if (region === 'korea') {
                     return (lng >= 124 && lng <= 132 && lat >= 33 && lat <= 43);
                 } else if (region === 'japan') {
@@ -484,77 +481,75 @@
                 url += `${mag}_${timeRange}.geojson`;
             }
 
+            const loadingEl = document.createElement('div');
+            loadingEl.className = 'loading';
+            loadingEl.textContent = '지진 데이터 로딩 중';
+            document.querySelector('.map-container').appendChild(loadingEl);
+
             try {
-                document.getElementById('map').innerHTML = '<div class="loading">지진 데이터 로딩 중</div>';
-                
                 const response = await fetch(url);
                 const data = await response.json();
                 
                 earthquakeData = data.features;
                 filteredData = filterByRegion(earthquakeData, region);
                 
-                renderMap();
+                renderMarkers();
                 updateStats();
                 updateChart();
+                
+                loadingEl.remove();
             } catch (error) {
-                document.getElementById('map').innerHTML = '<div class="loading">데이터를 불러오는데 실패했습니다</div>';
+                loadingEl.textContent = '데이터 로딩 실패. 새로고침 버튼을 눌러주세요.';
                 console.error('Error:', error);
             }
         }
 
-        function renderMap(dataToRender = null) {
-            const mapEl = document.getElementById('map');
-            mapEl.innerHTML = '';
-            
-            const mapWidth = mapEl.offsetWidth;
-            const mapHeight = mapEl.offsetHeight;
+        function clearMarkers() {
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+        }
 
+        function renderMarkers(dataToRender = null) {
+            clearMarkers();
+            
             const data = dataToRender || filteredData;
 
-            data.forEach((earthquake, index) => {
+            data.forEach((earthquake) => {
                 const props = earthquake.properties;
                 const [lng, lat, depth] = earthquake.geometry.coordinates;
                 
-                const pos = latLngToPixel(lat, lng, mapWidth, mapHeight);
+                const circle = L.circleMarker([lat, lng], {
+                    radius: getSize(props.mag),
+                    fillColor: getColor(depth),
+                    color: '#333',
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.7,
+                    className: 'earthquake-marker'
+                });
                 
-                const marker = document.createElement('div');
-                marker.className = 'earthquake-marker';
-                marker.style.left = pos.x + 'px';
-                marker.style.top = pos.y + 'px';
-                marker.style.width = getSize(props.mag) + 'px';
-                marker.style.height = getSize(props.mag) + 'px';
-                marker.style.background = getColor(depth);
-                marker.style.transform = 'translate(-50%, -50%)';
+                const date = new Date(props.time);
                 
-                marker.addEventListener('mouseenter', (e) => showTooltip(e, earthquake));
-                marker.addEventListener('mouseleave', hideTooltip);
+                const popupContent = `
+                    <div class="popup-title">${props.place}</div>
+                    <div class="popup-info">📅 ${date.toLocaleString('ko-KR')}</div>
+                    <div class="popup-info">📍 위치: ${lat.toFixed(2)}°, ${lng.toFixed(2)}°</div>
+                    <div class="popup-info">📏 규모: M ${props.mag}</div>
+                    <div class="popup-info">⬇️ 깊이: ${depth.toFixed(1)} km</div>
+                `;
                 
-                mapEl.appendChild(marker);
+                circle.bindPopup(popupContent);
+                circle.addTo(map);
+                markers.push(circle);
             });
-        }
 
-        function showTooltip(e, earthquake) {
-            const tooltip = document.getElementById('tooltip');
-            const props = earthquake.properties;
-            const [lng, lat, depth] = earthquake.geometry.coordinates;
-            
-            const date = new Date(props.time);
-            
-            tooltip.innerHTML = `
-                <div class="tooltip-title">${props.place}</div>
-                <div class="tooltip-info">📅 발생시각: ${date.toLocaleString('ko-KR')}</div>
-                <div class="tooltip-info">📍 위치: ${lat.toFixed(2)}°, ${lng.toFixed(2)}°</div>
-                <div class="tooltip-info">📏 규모: M ${props.mag}</div>
-                <div class="tooltip-info">⬇️ 깊이: ${depth.toFixed(1)} km</div>
-            `;
-            
-            tooltip.style.display = 'block';
-            tooltip.style.left = e.pageX + 15 + 'px';
-            tooltip.style.top = e.pageY + 15 + 'px';
-        }
-
-        function hideTooltip() {
-            document.getElementById('tooltip').style.display = 'none';
+            if (data.length > 0 && dataToRender === null) {
+                const bounds = L.latLngBounds(data.map(eq => [
+                    eq.geometry.coordinates[1],
+                    eq.geometry.coordinates[0]
+                ]));
+                map.fitBounds(bounds, { padding: [50, 50] });
+            }
         }
 
         function updateStats() {
@@ -582,9 +577,9 @@
             
             const ranges = [
                 { label: '<3.0', min: 0, max: 3.0 },
-                { label: '3.0-4.0', min: 3.0, max: 4.0 },
-                { label: '4.0-5.0', min: 4.0, max: 5.0 },
-                { label: '5.0-6.0', min: 5.0, max: 6.0 },
+                { label: '3-4', min: 3.0, max: 4.0 },
+                { label: '4-5', min: 4.0, max: 5.0 },
+                { label: '5-6', min: 5.0, max: 6.0 },
                 { label: '6.0+', min: 6.0, max: 10.0 }
             ];
             
@@ -639,7 +634,7 @@
                 }
                 
                 const currentData = sortedData.slice(0, simulationIndex + 1);
-                renderMap(currentData);
+                renderMarkers(currentData);
                 
                 const progress = Math.round((simulationIndex / sortedData.length) * 100);
                 document.getElementById('simStatus').textContent = 
@@ -654,18 +649,13 @@
                 clearInterval(simulationInterval);
                 simulationInterval = null;
                 document.getElementById('simStatus').textContent = '';
-                renderMap();
+                renderMarkers();
             }
         }
 
         window.addEventListener('load', () => {
+            initMap();
             loadEarthquakes();
-        });
-
-        window.addEventListener('resize', () => {
-            if (!simulationInterval) {
-                renderMap();
-            }
         });
     </script>
 </body>

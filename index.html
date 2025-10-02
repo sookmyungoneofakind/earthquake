@@ -4,247 +4,669 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>우리 동네 지진 관측기</title>
-    
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-     crossorigin=""/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-     crossorigin=""></script>
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-
     <style>
-        /* --- 기본 스타일 및 레이아웃 --- */
-        :root {
-            --bg-color: #2c3e50;
-            --fg-color: #ecf0f1;
-            --panel-bg: #34495e;
-            --border-color: #ecf0f1;
-            --accent-color: #e74c3c;
-            --shadow-color: #222;
-            --font-family: 'Press Start 2P', cursive;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
 
         body {
-            font-family: var(--font-family);
-            background-color: var(--bg-color);
-            color: var(--fg-color);
-            margin: 0;
-            padding: 0;
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            image-rendering: pixelated;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: #fff;
+            border: 4px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 8px 8px 0 rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            font-size: 28px;
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 0 #ffd700;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .controls {
+            background: #fff;
+            border: 4px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 8px 8px 0 rgba(0,0,0,0.2);
+        }
+
+        .control-group {
             display: flex;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 15px;
+            align-items: center;
         }
 
-        /* --- 픽셀 아트 스타일 UI 요소 (NES.css 스타일 참고) --- */
-        .pixel-box {
-            background-color: var(--panel-bg);
-            border: 4px solid var(--border-color);
-            box-shadow: 4px 4px 0px var(--shadow-color);
-            padding: 1rem;
-            margin-bottom: 1rem;
+        label {
+            font-weight: bold;
+            color: #333;
+            font-size: 14px;
         }
-        
-        button, select {
-            font-family: inherit;
-            background-color: #ddd;
-            color: #222;
-            border: 4px solid #222;
+
+        select, input {
             padding: 8px 12px;
-            cursor: pointer;
-            box-shadow: 2px 2px 0px #888;
+            border: 3px solid #333;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            background: #f0f0f0;
         }
 
-        button:active, select:active {
+        button {
+            padding: 10px 20px;
+            background: #ff6b6b;
+            color: white;
+            border: 3px solid #333;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 14px;
+            box-shadow: 4px 4px 0 rgba(0,0,0,0.2);
+            transition: all 0.1s;
+        }
+
+        button:hover {
+            background: #ff5252;
             transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0 rgba(0,0,0,0.2);
+        }
+
+        button:active {
+            transform: translate(4px, 4px);
             box-shadow: none;
         }
 
-        select {
-            -webkit-appearance: none;
-            -moz-appearance: none;
-            appearance: none;
-            background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2212%22%20height%3D%228%22%20viewBox%3D%220%200%2012%208%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M1.41%200L6%204.58L10.59%200L12%201.41L6%207.41L0%201.41L1.41%200Z%22%20fill%3D%22%23212529%22/%3E%3C/svg%3E');
-            background-repeat: no-repeat;
-            background-position: right 8px center;
-            padding-right: 28px;
+        .btn-play {
+            background: #51cf66;
         }
 
-        /* --- 헤더 --- */
-        header {
-            text-align: center;
-            padding: 10px;
-            background-color: var(--panel-bg);
-            border-bottom: 4px solid var(--border-color);
-            z-index: 1001; /* 지도 위에 표시 */
-        }
-        header h1 {
-            font-size: 1.5rem;
-            margin: 0;
-            color: var(--accent-color);
-            text-shadow: 2px 2px 0 #000;
+        .btn-play:hover {
+            background: #40c057;
         }
 
-        /* --- 메인 콘텐츠 (컨트롤 + 지도) --- */
+        .btn-stop {
+            background: #ffa94d;
+        }
+
+        .btn-stop:hover {
+            background: #ff922b;
+        }
+
         .main-content {
-            display: flex;
-            flex-grow: 1;
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+        }
+
+        .map-container {
+            background: #fff;
+            border: 4px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 8px 8px 0 rgba(0,0,0,0.2);
+            position: relative;
+            min-height: 600px;
+        }
+
+        #map {
+            width: 100%;
+            height: 600px;
+            background: #e0f2ff;
+            border: 3px solid #333;
+            border-radius: 4px;
+            position: relative;
             overflow: hidden;
         }
-        
-        /* --- 컨트롤 패널 --- */
-        #controls {
-            width: 280px;
-            padding: 15px;
-            background-color: var(--bg-color);
-            overflow-y: auto;
-            z-index: 1001;
+
+        .sidebar {
             display: flex;
             flex-direction: column;
-        }
-        .control-group {
-            margin-bottom: 20px;
-        }
-        .control-group label {
-            display: block;
-            margin-bottom: 10px;
-            font-size: 0.8rem;
-        }
-        #magnitude-slider {
-            width: 100%;
-        }
-        #magnitude-value {
-            color: #f1c40f;
-            text-align: center;
-            margin-top: 5px;
-            font-size: 1rem;
+            gap: 20px;
         }
 
-        /* --- 지도 --- */
-        #map {
-            flex-grow: 1;
-            height: 100%;
-            background-color: #1a252f;
-        }
-        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
-            background-color: var(--panel-bg);
-            color: var(--fg-color);
-            border: 4px solid var(--border-color);
-            box-shadow: 2px 2px 0px var(--shadow-color);
-            font-family: var(--font-family);
-            font-size: 0.7rem;
-        }
-        .leaflet-popup-content p { margin: 5px 0; }
-        .leaflet-container a.leaflet-popup-close-button {
-            color: var(--fg-color);
-            font-size: 1.2rem;
-            padding: 4px 4px 0 0;
-        }
-
-        /* --- 로딩 인디케이터 --- */
-        #loader {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 2000;
-            font-size: 1.2rem;
+        .info-box {
+            background: #fff;
+            border: 4px solid #333;
+            border-radius: 8px;
             padding: 20px;
-            display: none; /* 기본 숨김 */
+            box-shadow: 8px 8px 0 rgba(0,0,0,0.2);
         }
 
-        /* --- 범례 --- */
-        .legend {
+        .info-box h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+            border-bottom: 3px solid #333;
+            padding-bottom: 10px;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 2px dashed #ddd;
+        }
+
+        .stat-label {
+            font-weight: bold;
+            color: #555;
+        }
+
+        .stat-value {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .legend-circle {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #333;
+            border-radius: 50%;
+        }
+
+        .earthquake-marker {
+            position: absolute;
+            border-radius: 50%;
+            border: 2px solid #333;
+            cursor: pointer;
+            transition: all 0.2s;
+            animation: pulse 2s infinite;
+        }
+
+        .earthquake-marker:hover {
+            transform: scale(1.3);
+            z-index: 100;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; }
+        }
+
+        .tooltip {
+            position: absolute;
+            background: #fff;
+            border: 3px solid #333;
+            border-radius: 4px;
             padding: 10px;
-            line-height: 1.5;
-            font-size: 0.7rem;
-            background: rgba(44, 62, 80, 0.8);
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 1000;
+            box-shadow: 4px 4px 0 rgba(0,0,0,0.2);
+            display: none;
+            max-width: 250px;
         }
-        .legend i {
-            width: 18px;
-            height: 18px;
-            float: left;
-            margin-right: 8px;
-            opacity: 0.9;
-            border: 2px solid white;
+
+        .tooltip-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #ff6b6b;
         }
-        
-        /* --- 모바일 반응형 --- */
-        @media (max-width: 768px) {
+
+        .tooltip-info {
+            margin: 3px 0;
+            color: #333;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 18px;
+            color: #333;
+        }
+
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+
+        .chart-container {
+            height: 200px;
+            position: relative;
+            margin-top: 15px;
+        }
+
+        .bar-chart {
+            display: flex;
+            align-items: flex-end;
+            height: 150px;
+            gap: 8px;
+            padding: 10px;
+            border: 2px solid #333;
+            border-radius: 4px;
+            background: #f9f9f9;
+        }
+
+        .bar {
+            flex: 1;
+            background: #51cf66;
+            border: 2px solid #333;
+            border-radius: 4px 4px 0 0;
+            position: relative;
+            transition: all 0.3s;
+            min-height: 5px;
+        }
+
+        .bar:hover {
+            background: #40c057;
+        }
+
+        .bar-label {
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 10px;
+            white-space: nowrap;
+        }
+
+        .bar-value {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        @media (max-width: 1024px) {
             .main-content {
-                flex-direction: column;
+                grid-template-columns: 1fr;
             }
-            #controls {
-                width: 100%;
-                height: auto;
-                max-height: 40vh; /* 화면의 40%만 차지 */
-                flex-direction: row;
-                flex-wrap: wrap;
-                justify-content: space-around;
-                padding: 10px;
-                box-sizing: border-box;
-            }
-            .control-group {
-                width: 45%;
-                margin-bottom: 10px;
-            }
-            header h1 {
-                font-size: 1.2rem;
-            }
+        }
+
+        .pixel-icon {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            background: #333;
+            margin-right: 5px;
         }
     </style>
 </head>
 <body>
+    <div class="container">
+        <header>
+            <h1>🌍 우리 동네 지진 관측기</h1>
+            <p class="subtitle">미국 지질조사국(USGS) 실시간 데이터 활용</p>
+        </header>
 
-    <header class="pixel-box">
-        <h1>우리 동네 지진 관측기</h1>
-    </header>
-
-    <div class="main-content">
-        <div id="controls" class="pixel-box">
+        <div class="controls">
             <div class="control-group">
-                <label for="time-period">관측 기간</label>
-                <select id="time-period">
+                <label for="timeRange">시간 범위:</label>
+                <select id="timeRange">
                     <option value="hour">최근 1시간</option>
                     <option value="day" selected>최근 24시간</option>
                     <option value="week">최근 7일</option>
                     <option value="month">최근 30일</option>
                 </select>
-            </div>
 
-            <div class="control-group">
-                <label for="min-magnitude">최소 규모: <span id="magnitude-value">0</span></label>
-                <input type="range" id="magnitude-slider" min="0" max="9" step="0.5" value="0">
-            </div>
-
-            <div class="control-group">
-                <label for="region">지역 필터</label>
-                <select id="region">
-                    <option value="all">전 세계</option>
-                    <option value="ring_of_fire">'불의 고리'</option>
+                <label for="minMagnitude">최소 규모:</label>
+                <select id="minMagnitude">
+                    <option value="all">전체</option>
+                    <option value="2.5" selected>2.5 이상</option>
+                    <option value="4.5">4.5 이상</option>
+                    <option value="significant">중요 지진만</option>
                 </select>
+
+                <label for="region">지역 필터:</label>
+                <select id="region">
+                    <option value="all">전세계</option>
+                    <option value="ring">불의 고리</option>
+                    <option value="korea">한국 주변</option>
+                    <option value="japan">일본 주변</option>
+                </select>
+
+                <button onclick="loadEarthquakes()">🔄 새로고침</button>
+            </div>
+
+            <div class="control-group">
+                <button class="btn-play" onclick="startSimulation()">▶️ 시뮬레이션 시작</button>
+                <button class="btn-stop" onclick="stopSimulation()">⏹️ 정지</button>
+                <span id="simStatus" style="color: #333; font-weight: bold;"></span>
             </div>
         </div>
 
-        <div id="map"></div>
-    </div>
+        <div class="main-content">
+            <div class="map-container">
+                <div id="map">
+                    <div class="loading">지진 데이터 로딩 중</div>
+                </div>
+                <div class="tooltip" id="tooltip"></div>
+            </div>
 
-    <div id="loader" class="pixel-box">
-        데이터 로딩 중...
+            <div class="sidebar">
+                <div class="info-box">
+                    <h3>📊 통계 정보</h3>
+                    <div class="stat-item">
+                        <span class="stat-label">총 지진 횟수:</span>
+                        <span class="stat-value" id="totalCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">최대 규모:</span>
+                        <span class="stat-value" id="maxMag">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">평균 규모:</span>
+                        <span class="stat-value" id="avgMag">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">최대 깊이:</span>
+                        <span class="stat-value" id="maxDepth">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">최근 갱신:</span>
+                        <span class="stat-value" id="lastUpdate">-</span>
+                    </div>
+                </div>
+
+                <div class="info-box">
+                    <h3>🎨 범례</h3>
+                    <div class="legend-item">
+                        <div class="legend-circle" style="background: #ff6b6b;"></div>
+                        <span>얕은 지진 (0-70km)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-circle" style="background: #ffa94d;"></div>
+                        <span>중간 지진 (70-300km)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-circle" style="background: #51cf66;"></div>
+                        <span>깊은 지진 (300km 이상)</span>
+                    </div>
+                    <p style="margin-top: 15px; font-size: 12px; color: #666;">
+                        * 원의 크기는 지진 규모를 나타냅니다
+                    </p>
+                </div>
+
+                <div class="info-box">
+                    <h3>📈 규모별 분포</h3>
+                    <div class="chart-container">
+                        <div class="bar-chart" id="magnitudeChart"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // --- DOM 요소 ---
-            const mapElement = document.getElementById('map');
-            const loader = document.getElementById('loader');
-            const timePeriodSelect = document.getElementById('time-period');
-            const magnitudeSlider = document.getElementById('magnitude-slider');
-            const magnitudeValue = document.getElementById('magnitude-value');
-            const regionSelect = document.getElementById('region');
+        let earthquakeData = [];
+        let filteredData = [];
+        let simulationInterval = null;
+        let simulationIndex = 0;
 
-            let allEarthquakeData = []; //
+        function getColor(depth) {
+            if (depth < 70) return '#ff6b6b';
+            if (depth < 300) return '#ffa94d';
+            return '#51cf66';
+        }
+
+        function getSize(magnitude) {
+            return Math.max(6, Math.min(40, magnitude * 5));
+        }
+
+        function latLngToPixel(lat, lng, mapWidth, mapHeight) {
+            const x = (lng + 180) * (mapWidth / 360);
+            const y = (90 - lat) * (mapHeight / 180);
+            return { x, y };
+        }
+
+        function filterByRegion(data, region) {
+            if (region === 'all') return data;
+            
+            return data.filter(eq => {
+                const [lng, lat] = eq.geometry.coordinates;
+                
+                if (region === 'ring') {
+                    return (lng >= 120 && lng <= -60 && lat >= -60 && lat <= 60);
+                } else if (region === 'korea') {
+                    return (lng >= 124 && lng <= 132 && lat >= 33 && lat <= 43);
+                } else if (region === 'japan') {
+                    return (lng >= 128 && lng <= 146 && lat >= 30 && lat <= 46);
+                }
+                
+                return true;
+            });
+        }
+
+        async function loadEarthquakes() {
+            const timeRange = document.getElementById('timeRange').value;
+            const minMag = document.getElementById('minMagnitude').value;
+            const region = document.getElementById('region').value;
+
+            let url = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/';
+            
+            if (minMag === 'significant') {
+                url += `significant_${timeRange}.geojson`;
+            } else {
+                const mag = minMag === 'all' ? 'all' : minMag;
+                url += `${mag}_${timeRange}.geojson`;
+            }
+
+            try {
+                document.getElementById('map').innerHTML = '<div class="loading">지진 데이터 로딩 중</div>';
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                earthquakeData = data.features;
+                filteredData = filterByRegion(earthquakeData, region);
+                
+                renderMap();
+                updateStats();
+                updateChart();
+            } catch (error) {
+                document.getElementById('map').innerHTML = '<div class="loading">데이터를 불러오는데 실패했습니다</div>';
+                console.error('Error:', error);
+            }
+        }
+
+        function renderMap(dataToRender = null) {
+            const mapEl = document.getElementById('map');
+            mapEl.innerHTML = '';
+            
+            const mapWidth = mapEl.offsetWidth;
+            const mapHeight = mapEl.offsetHeight;
+
+            const data = dataToRender || filteredData;
+
+            data.forEach((earthquake, index) => {
+                const props = earthquake.properties;
+                const [lng, lat, depth] = earthquake.geometry.coordinates;
+                
+                const pos = latLngToPixel(lat, lng, mapWidth, mapHeight);
+                
+                const marker = document.createElement('div');
+                marker.className = 'earthquake-marker';
+                marker.style.left = pos.x + 'px';
+                marker.style.top = pos.y + 'px';
+                marker.style.width = getSize(props.mag) + 'px';
+                marker.style.height = getSize(props.mag) + 'px';
+                marker.style.background = getColor(depth);
+                marker.style.transform = 'translate(-50%, -50%)';
+                
+                marker.addEventListener('mouseenter', (e) => showTooltip(e, earthquake));
+                marker.addEventListener('mouseleave', hideTooltip);
+                
+                mapEl.appendChild(marker);
+            });
+        }
+
+        function showTooltip(e, earthquake) {
+            const tooltip = document.getElementById('tooltip');
+            const props = earthquake.properties;
+            const [lng, lat, depth] = earthquake.geometry.coordinates;
+            
+            const date = new Date(props.time);
+            
+            tooltip.innerHTML = `
+                <div class="tooltip-title">${props.place}</div>
+                <div class="tooltip-info">📅 발생시각: ${date.toLocaleString('ko-KR')}</div>
+                <div class="tooltip-info">📍 위치: ${lat.toFixed(2)}°, ${lng.toFixed(2)}°</div>
+                <div class="tooltip-info">📏 규모: M ${props.mag}</div>
+                <div class="tooltip-info">⬇️ 깊이: ${depth.toFixed(1)} km</div>
+            `;
+            
+            tooltip.style.display = 'block';
+            tooltip.style.left = e.pageX + 15 + 'px';
+            tooltip.style.top = e.pageY + 15 + 'px';
+        }
+
+        function hideTooltip() {
+            document.getElementById('tooltip').style.display = 'none';
+        }
+
+        function updateStats() {
+            if (filteredData.length === 0) {
+                document.getElementById('totalCount').textContent = '0';
+                document.getElementById('maxMag').textContent = '-';
+                document.getElementById('avgMag').textContent = '-';
+                document.getElementById('maxDepth').textContent = '-';
+                return;
+            }
+
+            const magnitudes = filteredData.map(eq => eq.properties.mag);
+            const depths = filteredData.map(eq => eq.geometry.coordinates[2]);
+            
+            document.getElementById('totalCount').textContent = filteredData.length;
+            document.getElementById('maxMag').textContent = 'M ' + Math.max(...magnitudes).toFixed(1);
+            document.getElementById('avgMag').textContent = 'M ' + (magnitudes.reduce((a, b) => a + b, 0) / magnitudes.length).toFixed(1);
+            document.getElementById('maxDepth').textContent = Math.max(...depths).toFixed(1) + ' km';
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('ko-KR');
+        }
+
+        function updateChart() {
+            const chart = document.getElementById('magnitudeChart');
+            chart.innerHTML = '';
+            
+            const ranges = [
+                { label: '<3.0', min: 0, max: 3.0 },
+                { label: '3.0-4.0', min: 3.0, max: 4.0 },
+                { label: '4.0-5.0', min: 4.0, max: 5.0 },
+                { label: '5.0-6.0', min: 5.0, max: 6.0 },
+                { label: '6.0+', min: 6.0, max: 10.0 }
+            ];
+            
+            const counts = ranges.map(range => 
+                filteredData.filter(eq => 
+                    eq.properties.mag >= range.min && eq.properties.mag < range.max
+                ).length
+            );
+            
+            const maxCount = Math.max(...counts, 1);
+            
+            ranges.forEach((range, i) => {
+                const bar = document.createElement('div');
+                bar.className = 'bar';
+                const height = (counts[i] / maxCount) * 100;
+                bar.style.height = height + '%';
+                
+                const label = document.createElement('div');
+                label.className = 'bar-label';
+                label.textContent = range.label;
+                
+                const value = document.createElement('div');
+                value.className = 'bar-value';
+                value.textContent = counts[i];
+                
+                bar.appendChild(label);
+                bar.appendChild(value);
+                chart.appendChild(bar);
+            });
+        }
+
+        function startSimulation() {
+            if (filteredData.length === 0) {
+                alert('먼저 데이터를 로드해주세요!');
+                return;
+            }
+
+            stopSimulation();
+            
+            const sortedData = [...filteredData].sort((a, b) => 
+                a.properties.time - b.properties.time
+            );
+            
+            simulationIndex = 0;
+            document.getElementById('simStatus').textContent = '시뮬레이션 진행 중...';
+            
+            simulationInterval = setInterval(() => {
+                if (simulationIndex >= sortedData.length) {
+                    stopSimulation();
+                    document.getElementById('simStatus').textContent = '시뮬레이션 완료!';
+                    return;
+                }
+                
+                const currentData = sortedData.slice(0, simulationIndex + 1);
+                renderMap(currentData);
+                
+                const progress = Math.round((simulationIndex / sortedData.length) * 100);
+                document.getElementById('simStatus').textContent = 
+                    `진행률: ${progress}% (${simulationIndex + 1}/${sortedData.length})`;
+                
+                simulationIndex++;
+            }, 100);
+        }
+
+        function stopSimulation() {
+            if (simulationInterval) {
+                clearInterval(simulationInterval);
+                simulationInterval = null;
+                document.getElementById('simStatus').textContent = '';
+                renderMap();
+            }
+        }
+
+        window.addEventListener('load', () => {
+            loadEarthquakes();
+        });
+
+        window.addEventListener('resize', () => {
+            if (!simulationInterval) {
+                renderMap();
+            }
+        });
+    </script>
+</body>
+</html>

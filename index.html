@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>우리 동네 지진 관측기</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
+    <style>
+        /* --- 기본 스타일 및 레이아웃 --- */
+        :root {
+            --bg-color: #2c3e50;
+            --fg-color: #ecf0f1;
+            --panel-bg: #34495e;
+            --border-color: #ecf0f1;
+            --accent-color: #e74c3c;
+            --shadow-color: #222;
+            --font-family: 'Press Start 2P', cursive;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-color);
+            color: var(--fg-color);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- 픽셀 아트 스타일 UI 요소 (NES.css 스타일 참고) --- */
+        .pixel-box {
+            background-color: var(--panel-bg);
+            border: 4px solid var(--border-color);
+            box-shadow: 4px 4px 0px var(--shadow-color);
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        button, select {
+            font-family: inherit;
+            background-color: #ddd;
+            color: #222;
+            border: 4px solid #222;
+            padding: 8px 12px;
+            cursor: pointer;
+            box-shadow: 2px 2px 0px #888;
+        }
+
+        button:active, select:active {
+            transform: translate(2px, 2px);
+            box-shadow: none;
+        }
+
+        select {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2212%22%20height%3D%228%22%20viewBox%3D%220%200%2012%208%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M1.41%200L6%204.58L10.59%200L12%201.41L6%207.41L0%201.41L1.41%200Z%22%20fill%3D%22%23212529%22/%3E%3C/svg%3E');
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            padding-right: 28px;
+        }
+
+        /* --- 헤더 --- */
+        header {
+            text-align: center;
+            padding: 10px;
+            background-color: var(--panel-bg);
+            border-bottom: 4px solid var(--border-color);
+            z-index: 1001; /* 지도 위에 표시 */
+        }
+        header h1 {
+            font-size: 1.5rem;
+            margin: 0;
+            color: var(--accent-color);
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        /* --- 메인 콘텐츠 (컨트롤 + 지도) --- */
+        .main-content {
+            display: flex;
+            flex-grow: 1;
+            overflow: hidden;
+        }
+        
+        /* --- 컨트롤 패널 --- */
+        #controls {
+            width: 280px;
+            padding: 15px;
+            background-color: var(--bg-color);
+            overflow-y: auto;
+            z-index: 1001;
+            display: flex;
+            flex-direction: column;
+        }
+        .control-group {
+            margin-bottom: 20px;
+        }
+        .control-group label {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 0.8rem;
+        }
+        #magnitude-slider {
+            width: 100%;
+        }
+        #magnitude-value {
+            color: #f1c40f;
+            text-align: center;
+            margin-top: 5px;
+            font-size: 1rem;
+        }
+
+        /* --- 지도 --- */
+        #map {
+            flex-grow: 1;
+            height: 100%;
+            background-color: #1a252f;
+        }
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+            background-color: var(--panel-bg);
+            color: var(--fg-color);
+            border: 4px solid var(--border-color);
+            box-shadow: 2px 2px 0px var(--shadow-color);
+            font-family: var(--font-family);
+            font-size: 0.7rem;
+        }
+        .leaflet-popup-content p { margin: 5px 0; }
+        .leaflet-container a.leaflet-popup-close-button {
+            color: var(--fg-color);
+            font-size: 1.2rem;
+            padding: 4px 4px 0 0;
+        }
+
+        /* --- 로딩 인디케이터 --- */
+        #loader {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2000;
+            font-size: 1.2rem;
+            padding: 20px;
+            display: none; /* 기본 숨김 */
+        }
+
+        /* --- 범례 --- */
+        .legend {
+            padding: 10px;
+            line-height: 1.5;
+            font-size: 0.7rem;
+            background: rgba(44, 62, 80, 0.8);
+        }
+        .legend i {
+            width: 18px;
+            height: 18px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.9;
+            border: 2px solid white;
+        }
+        
+        /* --- 모바일 반응형 --- */
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+            #controls {
+                width: 100%;
+                height: auto;
+                max-height: 40vh; /* 화면의 40%만 차지 */
+                flex-direction: row;
+                flex-wrap: wrap;
+                justify-content: space-around;
+                padding: 10px;
+                box-sizing: border-box;
+            }
+            .control-group {
+                width: 45%;
+                margin-bottom: 10px;
+            }
+            header h1 {
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="pixel-box">
+        <h1>우리 동네 지진 관측기</h1>
+    </header>
+
+    <div class="main-content">
+        <div id="controls" class="pixel-box">
+            <div class="control-group">
+                <label for="time-period">관측 기간</label>
+                <select id="time-period">
+                    <option value="hour">최근 1시간</option>
+                    <option value="day" selected>최근 24시간</option>
+                    <option value="week">최근 7일</option>
+                    <option value="month">최근 30일</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="min-magnitude">최소 규모: <span id="magnitude-value">0</span></label>
+                <input type="range" id="magnitude-slider" min="0" max="9" step="0.5" value="0">
+            </div>
+
+            <div class="control-group">
+                <label for="region">지역 필터</label>
+                <select id="region">
+                    <option value="all">전 세계</option>
+                    <option value="ring_of_fire">'불의 고리'</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="map"></div>
+    </div>
+
+    <div id="loader" class="pixel-box">
+        데이터 로딩 중...
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM 요소 ---
+            const mapElement = document.getElementById('map');
+            const loader = document.getElementById('loader');
+            const timePeriodSelect = document.getElementById('time-period');
+            const magnitudeSlider = document.getElementById('magnitude-slider');
+            const magnitudeValue = document.getElementById('magnitude-value');
+            const regionSelect = document.getElementById('region');
+
+            let allEarthquakeData = []; //
